@@ -1,5 +1,5 @@
   # Student-Success-Analysis-
-     ![image](https://github.com/Kartik-Doye/Student-Success-Analysis-/assets/140334885/670933a8-442b-43dc-9b3b-3476bf6b5dc5)
+![image](https://github.com/Kartik-Doye/Student-Success-Analysis-/assets/140334885/670933a8-442b-43dc-9b3b-3476bf6b5dc5)
  
 
 # **RELEVANCE:**
