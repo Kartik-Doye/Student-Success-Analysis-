@@ -1,0 +1,159 @@
+# main.py
+import os
+import io
+import tempfile
+import json
+import re
+import pandas as pd
+import streamlit as st
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.document_loaders import PyPDFLoader
+
+# ---------------- CONFIG ----------------
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    # quick fallback (only for local dev). Remove/comment this for production.
+    # WARNING: Avoid committing your key to git. Use env var instead.
+    # os.environ["GOOGLE_API_KEY"] = "AIzaSyCKxF3Vv2GUtOyS_-VdxdjGVUNqA4u6wyU"
+    raise RuntimeError(
+        "GOOGLE_API_KEY not found. Set it as an environment variable before running.\n"
+        "On mac/linux: export GOOGLE_API_KEY='AIza...'\n"
+        "On Windows (PowerShell): $env:GOOGLE_API_KEY='AIza...'"
+    )
+
+COLUMNS = [
+    "Sr. No.", "SB NO.", "S/B Date", "LEO Date", "CUSTOMER NAME", "FINAL INVOICE NO",
+    "SB. SOLAR / OTHER GOODS", "PORT CODE", "INCOTERMS", "COUNTRY", "H.S. Itch code",
+    "PRODUCT GROUP", "Qty", "Unit", "FOB Value declared by us (S/B)in FC",
+    "Currency of export", "Custom Exchange Rate in FC", "LEO Date Exchange Rate in in FC",
+    "FOB Value as per SB in INR", "FOB Value as per LEO ex rate in INR",
+    "ACTUAL FRT + INSURANC  IN FC", "Total Invoice Value in FC as per SB",
+    "PAYMENT RECEIPT", "PAYMENT OUTSTANDING", "Total Invoice Value in INR as per SB",
+    "SCHEME (ADV/DFIA/DRAWBACK)", "EPCG LICECE", "Drawback cap per unit in Rs. (₹)",
+    "DBK %", "DRAWBACK Receivable on fob", "DRAWBCK Scrol NO", "Scroll Date",
+    "DBK Realized BEFORE 31.03.2026", "SHORT REALIZATION", "BAL DBK",
+    "REASONS OF BAL DBK", "REMARKS FOR ACTION TAKEN FOR RECOVERY AS ON DTD. XX.XX.2020",
+    "RoDTEP%", "RoDTEP RECEIVABLE", "RoDTEP Y/N", "Transmitted Y/N",
+    "RoDTEP REALIZE BEFORE 31.03.2026", "SCRIP NUMBER", "SCRIP ISSUE DATE",
+    "SORT REALIZAION", "BAL RoDTEP", "REASONS OF BAL RoDTEP",
+    "DBK Not Realized BUT PAYMENT OUTSTANDING > 9 MONTH",
+    "Reason for BAL/SHORTFALL",
+    "REMARKS FOR ACTION TAKEN FOR RECOVERY AS ON DTD.",
+    "BOOKING IN SAP"
+]
+
+# ---------------- INIT GEMINI LLM ----------------
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0,
+    api_key=GOOGLE_API_KEY
+)
+
+# ---------------- JSON PARSING HELPERS ----------------
+def _extract_json_block(text: str):
+    m = re.search(r"(\[.*\]|\{.*\})", text, re.DOTALL)
+    return m.group(1) if m else None
+
+def generate_json_from_gemini(prompt: str, retries: int = 3):
+    for attempt in range(retries):
+        resp = llm.invoke(prompt)
+        text = resp.content if hasattr(resp, "content") else resp
+        try:
+            return json.loads(text)
+        except Exception:
+            pass
+        block = _extract_json_block(text)
+        if block:
+            try:
+                return json.loads(block)
+            except Exception:
+                pass
+    return []
+
+def normalize_extracted(extracted):
+    if isinstance(extracted, list):
+        return extracted
+    if isinstance(extracted, dict):
+        for v in extracted.values():
+            if isinstance(v, list) and all(isinstance(i, dict) for i in v):
+                return v
+        return [extracted]
+    return []
+
+# ---------------- PDF -> MATERIAL ROWS ----------------
+def process_single_pdf_bytes(pdf_bytes: bytes):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(pdf_bytes); tmp.flush(); tmp_path = tmp.name
+    try:
+        loader = PyPDFLoader(tmp_path)
+        docs = loader.load()
+        full_text = "\n".join(d.page_content for d in docs)
+    finally:
+        try: os.remove(tmp_path)
+        except Exception: pass
+
+    extraction_prompt = f"""
+You are an expert in export compliance. Extract material-wise line items from the given Shipping Bill.
+Return a JSON array where each element is a JSON object representing one material line item.
+
+Each object MUST contain the following keys (use empty string "" where value is missing):
+{COLUMNS}
+
+Return strictly valid JSON (an array). Do not include extra commentary or text outside the JSON array.
+
+Document:
+\"\"\"{full_text}\"\"\"
+"""
+    extracted_raw = generate_json_from_gemini(extraction_prompt)
+    rows = normalize_extracted(extracted_raw)
+    cleaned_rows = []
+    for r in rows:
+        if not isinstance(r, dict): continue
+        cleaned_rows.append({col: r.get(col, "") for col in COLUMNS})
+    return cleaned_rows
+
+def process_uploaded_pdfs(uploaded_files):
+    all_rows = []; errors = []
+    for f in uploaded_files:
+        try:
+            pdf_bytes = f.read()
+            rows = process_single_pdf_bytes(pdf_bytes)
+            if not rows:
+                errors.append((f.name, "No material items extracted (empty response)."))
+            else:
+                all_rows.extend(rows)
+        except Exception as e:
+            errors.append((f.name, str(e)))
+    return all_rows, errors
+
+# ---------------- STREAMLIT UI ----------------
+st.set_page_config(page_title="Shipping Bill Extractor (Material-wise)", layout="wide")
+st.title("📄 Shipping Bill Extractor — Material-wise")
+st.caption("Upload one or more Shipping Bill PDFs. Output will be material-level rows and a downloadable Excel.")
+
+uploaded = st.file_uploader("Upload Shipping Bill PDFs", type=["pdf"], accept_multiple_files=True)
+
+if uploaded:
+    if st.button("Process uploaded PDFs"):
+        with st.spinner("Extracting material-wise items from PDFs (may take ~30s per file)..."):
+            rows, errors = process_uploaded_pdfs(uploaded)
+        if rows:
+            df = pd.DataFrame(rows, columns=COLUMNS)
+            df["Sr. No."] = range(1, len(df) + 1)
+        else:
+            df = pd.DataFrame(columns=COLUMNS)
+        st.success("Extraction finished.")
+        st.dataframe(df, use_container_width=True)
+        towrite = io.BytesIO()
+        df.to_excel(towrite, index=False, engine="openpyxl")
+        towrite.seek(0)
+        st.download_button("📥 Download Excel (material-wise)", data=towrite,
+                           file_name="extracted_shipping_bill_material_wise.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        if errors:
+            st.warning("Some files produced errors:")
+            for name, msg in errors:
+                st.markdown(f"- **{name}**: `{msg}`")
+else:
+    st.info("Please upload one or more shipping bill PDF files to begin.")
+
