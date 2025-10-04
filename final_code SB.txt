@@ -1,0 +1,114 @@
+import os
+import pandas as pd
+import json
+import re
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.document_loaders import PyPDFLoader
+
+# ---------------- CONFIG ----------------
+INPUT_FOLDER = "/workspaces/jubilant-invention/Bill_Folder"
+OUTPUT_XLSX = "/workspaces/jubilant-invention/extracted_shipping_bill_all.xlsx"
+
+# Set your Google API Key
+GOOGLE_API_KEY = "AIzaSyCKxF3Vv2GUtOyS_-VdxdjGVUNqA4u6wyU"
+
+# Column headers
+COLUMNS = [
+    "Sr. No.", "SB NO.", "S/B Date", "LEO Date", "CUSTOMER NAME", "FINAL INVOICE NO",
+    "SB. SOLAR / OTHER GOODS", "PORT CODE", "INCOTERMS", "COUNTRY", "H.S. Itch code",
+    "PRODUCT GROUP", "Qty", "Unit", "FOB Value declared by us (S/B)in FC",
+    "Currency of export", "Custom Exchange Rate in FC", "LEO Date Exchange Rate in in FC",
+    "FOB Value as per SB in INR", "FOB Value as per LEO ex rate in INR",
+    "ACTUAL FRT + INSURANC  IN FC", "Total Invoice Value in FC as per SB",
+    "PAYMENT RECEIPT", "PAYMENT OUTSTANDING", "Total Invoice Value in INR as per SB",
+    "SCHEME (ADV/DFIA/DRAWBACK)", "EPCG LICECE", "Drawback cap per unit in Rs. (₹)",
+    "DBK %", "DRAWBACK Receivable on fob", "DRAWBCK Scrol NO", "Scroll Date",
+    "DBK Realized BEFORE 31.03.2026", "SHORT REALIZATION", "BAL DBK",
+    "REASONS OF BAL DBK", "REMARKS FOR ACTION TAKEN FOR RECOVERY AS ON DTD. XX.XX.2020",
+    "RoDTEP%", "RoDTEP RECEIVABLE", "RoDTEP Y/N", "Transmitted Y/N",
+    "RoDTEP REALIZE BEFORE 31.03.2026", "SCRIP NUMBER", "SCRIP ISSUE DATE",
+    "SORT REALIZAION", "BAL RoDTEP", "REASONS OF BAL RoDTEP",
+    "DBK Not Realized BUT PAYMENT OUTSTANDING > 9 MONTH",
+    "Reason for BAL/SHORTFALL",
+    "REMARKS FOR ACTION TAKEN FOR RECOVERY AS ON DTD.",
+    "BOOKING IN SAP"
+]
+
+# ---------------- INIT GEMINI ----------------
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0,
+    api_key=GOOGLE_API_KEY
+)
+
+# ---------------- JSON PARSING HELPER ----------------
+def generate_json_from_gemini(prompt: str, retries: int = 3):
+    """Try multiple times to ensure valid JSON."""
+    for attempt in range(retries):
+        raw_response = llm.invoke(prompt)
+        text = raw_response.content if hasattr(raw_response, "content") else raw_response
+
+        # Try direct JSON
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # Try extracting JSON block
+        cleaned = re.search(r"\[.*\]|\{.*\}", text, re.DOTALL)
+        if cleaned:
+            try:
+                return json.loads(cleaned.group())
+            except json.JSONDecodeError:
+                continue
+
+    return []  # if all fails return empty list
+
+# ---------------- PROCESS ALL PDFs ----------------
+all_rows = []
+pdf_files = [f for f in os.listdir(INPUT_FOLDER) if f.lower().endswith(".pdf")]
+
+for idx, pdf_file in enumerate(pdf_files, start=1):
+    pdf_path = os.path.join(INPUT_FOLDER, pdf_file)
+    print(f"\nProcessing {idx}/{len(pdf_files)}: {pdf_file}")
+
+    loader = PyPDFLoader(pdf_path)
+    docs = loader.load()
+    full_text = "\n".join(doc.page_content for doc in docs)
+
+    extraction_prompt = f"""
+You are an expert in export compliance. 
+Extract **material-wise line items** from the given Shipping Bill document.  
+
+For each material inside each invoice of the Shipping Bill, return one JSON object.  
+So if a Shipping Bill has multiple invoices and multiple materials, return a JSON **array** with one object per material.  
+
+Each object must contain the following keys:
+
+{COLUMNS}
+
+If a value is not present in the PDF, return it as an empty string.
+
+Document:
+\"\"\"{full_text}\"\"\"
+"""
+
+    extracted_data = generate_json_from_gemini(extraction_prompt)
+
+    if isinstance(extracted_data, dict):
+        # sometimes Gemini returns dict instead of list
+        extracted_data = [extracted_data]
+
+    for row in extracted_data:
+        row_clean = {col: row.get(col, "") for col in COLUMNS}
+        all_rows.append(row_clean)
+
+# ---------------- CREATE DATAFRAME ----------------
+df = pd.DataFrame(all_rows, columns=COLUMNS)
+
+# Auto-generate Sr. No. (overwrite if already exists)
+df["Sr. No."] = range(1, len(df) + 1)
+
+# ---------------- SAVE TO EXCEL ----------------
+df.to_excel(OUTPUT_XLSX, index=False)
+print(f"\n✅ All material-wise data extracted and saved to: {OUTPUT_XLSX}")

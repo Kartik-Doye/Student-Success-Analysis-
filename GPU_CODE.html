@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GPU vs Development Team — Simple Explanation</title>
+  <style>
+    body{font-family:Arial, sans-serif;line-height:1.6;margin:0;padding:0;background:#f9fafb;color:#111}
+    .container{max-width:900px;margin:0 auto;padding:20px}
+    h1{color:#0ea5a4}
+    h2{color:#f59e0b;margin-top:20px}
+    .card{background:#fff;border-radius:8px;padding:16px;margin:16px 0;box-shadow:0 4px 10px rgba(0,0,0,0.05)}
+    .example{background:#f1f5f9;padding:10px;border-radius:6px;margin:8px 0}
+    ul{margin:6px 0 12px 18px}
+    footer{text-align:center;font-size:14px;color:#555;margin-top:20px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Understanding GPU Cores with a Development Team Analogy</h1>
+
+    <div class="card">
+      <h2>Step 1: CPU vs GPU</h2>
+      <p><strong>CPU (Central Processing Unit)</strong> = Project Manager (PM). The PM is smart and can handle many different tasks, but usually works on them one at a time.</p>
+      <p><strong>GPU (Graphics Processing Unit)</strong> = Whole Development Team. A GPU has many workers (cores) that can all do tasks in parallel, finishing faster when the job can be split.</p>
+    </div>
+
+    <div class="card">
+      <h2>Step 2: Different GPU Cores = Different Roles in a Team</h2>
+
+      <h3>1. CUDA Cores — The Developers</h3>
+      <p><strong>Development Team Analogy:</strong> These are the programmers writing and testing code. They handle most of the work that can be broken into many small tasks.</p>
+      <div class="example">
+        <ul>
+          <li>Many developers coding different parts of a website at the same time.</li>
+          <li>Fixing multiple simple bugs in parallel.</li>
+        </ul>
+      </div>
+      <p><strong>GPU Real Example:</strong> CUDA cores calculate millions of pixels for games, process videos, or simulate weather models all at once.</p>
+
+      <h3>2. Tensor Cores — The AI Specialists</h3>
+      <p><strong>Development Team Analogy:</strong> These are the data scientists or AI engineers. They focus on analyzing data and building models.</p>
+      <div class="example">
+        <ul>
+          <li>Training a chatbot to answer questions.</li>
+          <li>Creating an AI tool that automatically suggests code.</li>
+        </ul>
+      </div>
+      <p><strong>GPU Real Example:</strong> Tensor cores speed up AI tasks like image recognition, natural language processing, and DLSS (AI upscaling in games).</p>
+
+      <h3>3. RT Cores — The Testers and Designers</h3>
+      <p><strong>Development Team Analogy:</strong> These are the testers and UX designers who focus on making the product look and feel real and correct.</p>
+      <div class="example">
+        <ul>
+          <li>Testers checking that the UI looks natural on different screens.</li>
+          <li>Designers making sure lighting and shadows look realistic in a demo app.</li>
+        </ul>
+      </div>
+      <p><strong>GPU Real Example:</strong> RT cores calculate realistic lighting, shadows, and reflections in 3D graphics and architecture models.</p>
+    </div>
+
+    <div class="card">
+      <h2>Step 3: How They Work Together</h2>
+      <p>Imagine the PM (CPU) gives a new project to the team:</p>
+      <ul>
+        <li><strong>Developers (CUDA cores)</strong> build the main product quickly.</li>
+        <li><strong>AI Engineers (Tensor cores)</strong> add smart features like chatbots or recommendations.</li>
+        <li><strong>Testers/Designers (RT cores)</strong> make sure the product looks great and works smoothly.</li>
+      </ul>
+      <p>Together, the project is delivered faster and with better quality — just like how CUDA, Tensor, and RT cores in a GPU work together to render stunning games, run AI, and simulate real-world visuals.</p>
+    </div>
+
+    <footer>
+      <p>💡 Tip: Think of the CPU as the planner and the GPU as the doer. The more specialized cores in the GPU, the more powerful and efficient the work becomes!</p>
+    </footer>
+  </div>
+</body>
+</html>
