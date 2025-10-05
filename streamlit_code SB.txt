@@ -14,7 +14,7 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     # quick fallback (only for local dev). Remove/comment this for production.
     # WARNING: Avoid committing your key to git. Use env var instead.
-    # os.environ["GOOGLE_API_KEY"] = "AIzaSyCKxF3Vv2GUtOyS_-VdxdjGVUNqA4u6wyU"
+    # os.environ["GOOGLE_API_KEY"] = ""
     raise RuntimeError(
         "GOOGLE_API_KEY not found. Set it as an environment variable before running.\n"
         "On mac/linux: export GOOGLE_API_KEY='AIza...'\n"
@@ -156,4 +156,5 @@ if uploaded:
                 st.markdown(f"- **{name}**: `{msg}`")
 else:
     st.info("Please upload one or more shipping bill PDF files to begin.")
+
 
