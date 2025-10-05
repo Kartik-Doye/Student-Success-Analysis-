@@ -17,8 +17,8 @@ if not GOOGLE_API_KEY:
     # os.environ["GOOGLE_API_KEY"] = ""
     raise RuntimeError(
         "GOOGLE_API_KEY not found. Set it as an environment variable before running.\n"
-        "On mac/linux: export GOOGLE_API_KEY='AIza...'\n"
-        "On Windows (PowerShell): $env:GOOGLE_API_KEY='AIza...'"
+        "On mac/linux: export GOOGLE_API_KEY=''\n"
+        "On Windows (PowerShell): $env:GOOGLE_API_KEY=''"
     )
 
 COLUMNS = [
@@ -156,5 +156,6 @@ if uploaded:
                 st.markdown(f"- **{name}**: `{msg}`")
 else:
     st.info("Please upload one or more shipping bill PDF files to begin.")
+
 
 
