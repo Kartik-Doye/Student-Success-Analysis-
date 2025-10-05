@@ -10,7 +10,7 @@ INPUT_FOLDER = "/workspaces/jubilant-invention/Bill_Folder"
 OUTPUT_XLSX = "/workspaces/jubilant-invention/extracted_shipping_bill_all.xlsx"
 
 # Set your Google API Key
-GOOGLE_API_KEY = "AIzaSyCKxF3Vv2GUtOyS_-VdxdjGVUNqA4u6wyU"
+GOOGLE_API_KEY = ""
 
 # Column headers
 COLUMNS = [
@@ -112,3 +112,4 @@ df["Sr. No."] = range(1, len(df) + 1)
 # ---------------- SAVE TO EXCEL ----------------
 df.to_excel(OUTPUT_XLSX, index=False)
 print(f"\n✅ All material-wise data extracted and saved to: {OUTPUT_XLSX}")
+
